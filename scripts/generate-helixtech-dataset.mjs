@@ -1,18 +1,27 @@
 /**
- * Generates Helix Tech Support IT helpdesk contact dataset (2,200 records, 8 weeks).
+ * Generates Helix Tech contact dataset (10,000 records, 8 weeks).
  * Run: node scripts/generate-helixtech-dataset.mjs
  */
 import { writeFileSync, mkdirSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
+import {
+  DRIVER_TAXONOMY,
+  L1_CATEGORIES,
+  L1_WEIGHTS,
+  L2_WEIGHTS,
+  isHighRiskDriver,
+  pickWeightedDriver,
+} from '../src/data/contactDriverTaxonomy.js'
+import { DRIVER_ISSUE_TEMPLATES } from './helixtech-driver-templates.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 const OUT = join(ROOT, 'public', 'data', 'contact_search_data.json')
 const STATS_OUT = join(ROOT, 'scripts', 'dataset-stats.json')
 
-const TOTAL = 2200
+const TOTAL = 10000
 const WEEKS = 8
 const PER_WEEK = TOTAL / WEEKS
 
@@ -27,25 +36,15 @@ const WEEK_BOUNDARIES = [
   { start: '2026-05-25', end: '2026-05-31', label: 'W8' },
 ]
 
-const QUEUES = ['POS Hardware', 'Network & Connectivity', 'Printer & Peripherals', 'Account Access', 'Software Support']
-const QUEUE_WEIGHTS = [0.28, 0.19, 0.14, 0.12, 0.27]
 const CHANNELS = ['voice', 'email', 'chat']
 const CHANNEL_WEIGHTS = [0.65, 0.22, 0.13]
 
 const FEATURED_AGENTS = [
-  'Sipho Ndlovu',
-  'Zanele Mokoena',
-  'Ruan Pretorius',
-  'Nompumelelo Dube',
-  'Andile Khumalo',
-  'Mariska Joubert',
-  'Thabo Mahlangu',
-  'Kefilwe Sithole',
-  'Jaco Steyn',
-  'Aisha Osman',
+  'Michael Naidoo', 'Nomsa Dlamini', 'Lerato Nkosi', 'Pieter Botha', 'Busisiwe Maseko',
+  'Ayanda Mbeki', 'Zanele Ndlovu', 'Thabo van der Merwe', 'Janine Jacobs', 'Sipho Khumalo',
 ]
 
-const COACHED_AGENTS = ['Zanele Mokoena', 'Andile Khumalo', 'Nompumelelo Dube', 'Mariska Joubert']
+const COACHED_AGENTS = ['Lerato Nkosi', 'Pieter Botha', 'Busisiwe Maseko', 'Ayanda Mbeki']
 
 const EXTRA_AGENTS = [
   'Andile Zulu', 'Bongani Ngcobo', 'Candice Pretorius', 'Dumisani Mthembu', 'Elize Steyn',
@@ -67,47 +66,32 @@ const EXTRA_AGENTS = [
 
 const ALL_AGENTS = [...FEATURED_AGENTS, ...EXTRA_AGENTS].slice(0, 85)
 
+const CF_WEEKLY_TARGET = [77, 82, 105, 123, 59, 45, 32, 41]
+
+const FEATURED_CF_CALLS = [
+  { callId: 'HT-RX-CF0001', agent: 'Pieter Botha', date: '2026-04-14', cfType: 'policy_misquote' },
+  { callId: 'HT-RX-CF0002', agent: 'Lerato Nkosi', date: '2026-04-22', cfType: 'no_resolution_confirmation' },
+  { callId: 'HT-RX-CF0003', agent: 'Ayanda Mbeki', date: '2026-05-01', cfType: 'verification_failure' },
+  { callId: 'HT-RX-CF0004', agent: 'Zanele Ndlovu', date: '2026-05-08', cfType: 'escalation_avoidance' },
+  { callId: 'HT-RX-CF0005', agent: 'Busisiwe Maseko', date: '2026-04-18', cfType: 'no_case_notes' },
+]
+
 const CF_TYPES = [
-  { id: 'premature_dispatch', label: 'Premature dispatch: L3 on-site requested before remote triage completed', pillar: 'Escalation' },
-  { id: 'skipped_triage', label: 'Skipped triage: reboot and network check not completed before escalation', pillar: 'Diagnosis' },
-  { id: 'no_sla_clock', label: 'No SLA clock: ticket closed without starting SLA timer or giving ETA', pillar: 'Expectation Setting' },
-  { id: 'no_ticket_notes', label: 'No ticket notes: repeat contact where prior interaction had no documentation', pillar: 'Documentation Accuracy' },
-  { id: 'escalation_avoidance', label: 'Escalation avoidance: criteria met but not escalated, third contact from same store', pillar: 'Escalation' },
+  { id: 'policy_misquote', label: 'Policy misquote: 24-hour SLA stated (critical replacement policy is 4 hours)', pillar: 'Business Policy' },
+  { id: 'no_resolution_confirmation', label: 'No first-call fix: call closed without confirming terminal status or workaround', pillar: 'First-Call Fix' },
+  { id: 'no_case_notes', label: 'No case notes: repeat contact where prior interaction had no documentation', pillar: 'Documentation Accuracy' },
+  { id: 'escalation_avoidance', label: 'Escalation avoidance: criteria met but not escalated, third contact from same customer', pillar: 'Escalation' },
+  { id: 'verification_failure', label: 'Verification failure: terminal reset processed without client verification', pillar: 'Verification' },
 ]
 
-const POS_SUBCATEGORIES = [
-  'POS Not Connecting', 'Terminal Reboot Required', 'Card Reader Failure',
-  'POS Software Crash', 'Receipt Printer Jam', 'Cash Drawer Malfunction',
-  'POS Login Failure', 'Payment Processing Error',
-]
-
-const NETWORK_SUBCATEGORIES = [
-  'Store Network Outage', 'WiFi Down at Location', 'VPN Connection Failure',
-  'Router Offline', 'Internet Speed Degraded', 'Firewall Blocking Access',
-  'DNS Resolution Failure',
-]
-
-const PRINTER_SUBCATEGORIES = [
-  'Receipt Printer Offline', 'Label Printer Jam', 'Driver Install Required',
-  'Print Queue Stuck', 'Wrong Printer Selected',
-]
-
-const ACCOUNT_SUBCATEGORIES = [
-  'Password Reset', 'Account Locked', 'New User Setup',
-  'Permissions Change', 'SSO Login Failure',
-]
-
-const SOFTWARE_SUBCATEGORIES = [
-  'Software Install Error', 'Application Update Failed', 'License Activation',
-  'Inventory App Crash', 'POS Software Update',
-]
+const HIGH_RISK_L2_PICK = ["Terminal Failures","Hardware Replacement","Card Reader Faults","Receipt Printer Issues"]
 
 const FIRST_NAMES = ['Alex', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Jamie', 'Avery', 'Quinn', 'Blake', 'Drew', 'Skyler', 'Cameron', 'Reese', 'Parker']
 const LAST_NAMES = ['Miller', 'Davis', 'Wilson', 'Brown', 'Garcia', 'Martinez', 'Anderson', 'Thomas', 'Jackson', 'White', 'Harris', 'Martin', 'Thompson', 'Robinson', 'Clark']
 
-const REPEAT_CLUSTERS = Array.from({ length: 45 }, (_, i) => ({
-  order: `HL-STR-${10000 + i}`,
-  customer: `Store ${1200 + i} - ${['Sandton', 'Cape Town', 'Durban', 'Pretoria', 'Port Elizabeth'][i % 5]}`,
+const REPEAT_CLUSTERS = Array.from({ length: 205 }, (_, i) => ({
+  ticket: `HT-TKT-${10000 + i}`,
+  customer: `${FIRST_NAMES[i % 15]} ${LAST_NAMES[i % 15]}`,
   contacts: 2 + (i % 3),
 }))
 
@@ -131,6 +115,22 @@ function pick(arr) {
   return arr[Math.floor(rand() * arr.length)]
 }
 
+function pickDriver(opts = {}) {
+  if (opts.l1 && opts.l2) return { l1: opts.l1, l2: opts.l2 }
+  if (opts.l1) {
+    const l2Items = DRIVER_TAXONOMY[opts.l1]
+    const weights = L2_WEIGHTS[opts.l1]
+    const l2Weights = l2Items.map((l2) => weights[l2] ?? 1 / l2Items.length)
+    return { l1: opts.l1, l2: pickWeighted(l2Items, l2Weights) }
+  }
+  if (opts.forceHighRisk) {
+    const l1 = pick(["POS Hardware"])
+    const l2Items = DRIVER_TAXONOMY[l1].filter((l2) => HIGH_RISK_L2_PICK.includes(l2))
+    return { l1, l2: pick(l2Items.length ? l2Items : DRIVER_TAXONOMY[l1]) }
+  }
+  return pickWeightedDriver(rand)
+}
+
 function dateInWeek(weekIdx) {
   const w = WEEK_BOUNDARIES[weekIdx]
   const start = new Date(w.start)
@@ -147,32 +147,32 @@ function dateInWeek(weekIdx) {
   }
 }
 
-function weekParams(weekIdx, queue, agentName) {
+function weekParams(weekIdx, l1, l2, agentName) {
   const phase = weekIdx < 4 ? 'decline' : weekIdx === 4 ? 'intervention' : 'recovery'
-  const isPOS = queue === 'POS Hardware'
+  const isHighRisk = isHighRiskDriver(l1, l2)
   const isCoached = COACHED_AGENTS.includes(agentName)
 
-  let fcrBase = isPOS ? 0.55 : queue === 'Network & Connectivity' ? 0.64 : queue === 'Account Access' ? 0.82 : 0.72
-  let ahtBase = isPOS ? 580 : queue === 'Network & Connectivity' ? 560 : queue === 'Printer & Peripherals' ? 480 : 380
-  let csatBase = isPOS ? 3.3 : 3.9
-  let escProb = isPOS ? 0.20 : 0.10
-  let trProb = isPOS ? 0.14 : 0.08
-  let repeatProb = isPOS ? 0.26 : 0.12
-  let cfProb = isPOS ? 0.04 : 0.01
+  let fcrBase = isHighRisk ? 0.48 : l1 === 'Software & Updates' ? 0.68 : 0.75
+  let ahtBase = isHighRisk ? 380 : l1 === 'Software & Updates' ? 310 : 260
+  let csatBase = isHighRisk ? 3.2 : 3.8
+  let escProb = isHighRisk ? 0.12 : 0.06
+  let trProb = isHighRisk ? 0.18 : 0.10
+  let repeatProb = isHighRisk ? 0.28 : 0.12
+  let cfProb = isHighRisk ? 0.04 : 0.01
 
-  if (phase === 'decline' && isPOS) {
+  if (phase === 'decline' && isHighRisk) {
     fcrBase -= 0.02 * weekIdx
     ahtBase += 15 * weekIdx
     csatBase -= 0.08 * weekIdx
     repeatProb += 0.03 * weekIdx
     cfProb += 0.008 * weekIdx
-  } else if (phase === 'intervention' && isPOS) {
+  } else if (phase === 'intervention' && isHighRisk) {
     fcrBase -= 0.05
     ahtBase += 55
     csatBase -= 0.15
     repeatProb += 0.05
     cfProb += 0.01
-  } else if (phase === 'recovery' && isPOS) {
+  } else if (phase === 'recovery' && isHighRisk) {
     const recoveryWeek = weekIdx - 5
     fcrBase += 0.06 + recoveryWeek * 0.04
     ahtBase -= 20 + recoveryWeek * 12
@@ -181,7 +181,7 @@ function weekParams(weekIdx, queue, agentName) {
     cfProb -= 0.015
   }
 
-  if (isCoached && isPOS) {
+  if (isCoached && isHighRisk) {
     if (phase === 'decline' || phase === 'intervention') {
       fcrBase -= 0.12
       ahtBase += 40
@@ -197,19 +197,18 @@ function weekParams(weekIdx, queue, agentName) {
     }
   }
 
-  // High performers on returns
-  if (agentName === 'Sipho Ndlovu' && isPOS) {
+  if (agentName === 'Michael Naidoo' && isHighRisk) {
     fcrBase = Math.max(fcrBase, 0.82)
     csatBase = Math.max(csatBase, 4.1)
     cfProb *= 0.2
   }
-  if (agentName === 'Kefilwe Sithole' && isPOS && phase !== 'recovery') {
+  if (agentName === 'Zanele Ndlovu' && isHighRisk && phase !== 'recovery') {
     fcrBase = Math.min(fcrBase, 0.35)
     csatBase = Math.min(csatBase, 2.5)
     cfProb += 0.03
   }
 
-  return { fcrBase, ahtBase, csatBase, escProb, trProb, repeatProb, cfProb, phase }
+  return { fcrBase, ahtBase, csatBase, escProb, trProb, repeatProb, cfProb, phase, isHighRisk }
 }
 
 function makeQuestionEvals(qaScore, cfType) {
@@ -219,10 +218,10 @@ function makeQuestionEvals(qaScore, cfType) {
     const qid = `q${i}`
     const applicable = i !== 3 && i !== 10
     let awarded = applicable && i <= metCount ? 1 : applicable ? 0 : null
-    if (cfType === 'premature_dispatch' && qid === 'q5') awarded = 0
-    if (cfType === 'skipped_triage' && qid === 'q2') awarded = 0
-    if (cfType === 'no_ticket_notes' && qid === 'q11') awarded = 0
-    if (cfType === 'no_sla_clock' && qid === 'q6') awarded = 0
+    if (cfType === 'policy_misquote' && qid === 'q13') awarded = 0
+    if (cfType === 'no_resolution_confirmation' && qid === 'q9') awarded = 0
+    if (cfType === 'no_case_notes' && qid === 'q11') awarded = 0
+    if (cfType === 'verification_failure' && qid === 'q4') awarded = 0
     evals.push({
       na_reason: applicable ? null : 'Not applicable for this contact type.',
       reasoning: applicable ? 'Evaluated from transcript.' : 'N/A',
@@ -238,17 +237,16 @@ function makeQuestionEvals(qaScore, cfType) {
   return evals
 }
 
-function sectionScores(queue, qaScore, cfType) {
-  const isPOS = queue === 'POS Hardware'
-  const doc = isPOS ? Math.min(qaScore - 15, 55) : qaScore - 5
-  const resolution = isPOS ? Math.min(qaScore - 10, 60) : qaScore
-  const policy = cfType === 'premature_dispatch' ? 20 : qaScore
+function sectionScores(isHighRisk, qaScore, cfType) {
+  const doc = isHighRisk ? Math.min(qaScore - 15, 55) : qaScore - 5
+  const resolution = isHighRisk ? Math.min(qaScore - 10, 60) : qaScore
+  const policy = cfType === 'policy_misquote' ? 20 : qaScore
   const experience = qaScore + 5
   return [
     { section: 'Customer Experience', score_pct: Math.min(100, experience), earned_weight: 26, applicable_weight: 34 },
     { section: 'Policy and Compliance', score_pct: Math.min(100, policy), earned_weight: 12, applicable_weight: 12 },
     { section: 'Documentation Accuracy', score_pct: Math.max(20, doc), earned_weight: 25, applicable_weight: 34 },
-    { section: 'Resolution & Close', score_pct: Math.max(15, resolution), earned_weight: 20, applicable_weight: 20 },
+    { section: 'First-Call Fix', score_pct: Math.max(15, resolution), earned_weight: 20, applicable_weight: 20 },
   ]
 }
 
@@ -260,78 +258,52 @@ function customerLine(text) {
   return `Customer: ${text}`
 }
 
-const SUBCATEGORY_ISSUES = {
-  'POS Not Connecting': {
-    customerOpen: 'Our POS terminal at store {order} is not connecting to the network. We cannot process any sales.',
-    customerFollow: 'We have already tried turning it off and on once but it still shows offline.',
-    agentFinding: 'I am pulling up store {order} in our monitoring dashboard now.',
-    agentResolve: 'I have confirmed the terminal is back online after the reboot and network check. Ticket is resolved remotely - no dispatch needed.',
-  },
-  'Terminal Reboot Required': {
-    customerOpen: 'The POS screen is frozen on the login page at store {order}.',
-    customerFollow: 'We have customers waiting in line.',
-    agentFinding: 'I can see the terminal status shows unresponsive in our system.',
-    agentResolve: 'Please hold the power button for 10 seconds to reboot. I will stay on the line while it restarts. Terminal should be back within 2 minutes.',
-  },
-  'Card Reader Failure': {
-    customerOpen: 'The card reader on our main register is not reading any cards at store {order}.',
-    customerFollow: 'We have tried two different cards and both failed.',
-    agentFinding: 'I can see the card reader showing a connection error in device management.',
-    agentResolve: 'I have reset the card reader driver remotely. Please test with a card now - it should process normally.',
-  },
-  'Store Network Outage': {
-    customerOpen: 'Our entire store network is down at location {order}. Nothing can connect.',
-    customerFollow: 'All registers and the back office are offline.',
-    agentFinding: 'I can see a network outage alert for your store region.',
-    agentResolve: 'I have identified the issue as a router failure. I am dispatching a technician - ETA within 4 hours. SLA clock started on ticket {order}.',
-  },
-  'WiFi Down at Location': {
-    customerOpen: 'WiFi is down at store {order} and our mobile POS devices cannot connect.',
-    customerFollow: 'The wired registers work but handhelds are offline.',
-    agentFinding: 'I can see the access point is not responding in our monitoring tool.',
-    agentResolve: 'I have remotely restarted the access point. WiFi should be back within 5 minutes. I will confirm once devices reconnect.',
-  },
-  'Receipt Printer Offline': {
-    customerOpen: 'The receipt printer at store {order} shows offline and we cannot print receipts.',
-    customerFollow: 'We checked the power and USB cable - both look fine.',
-    agentFinding: 'I can see the printer spooler is stuck in our remote management console.',
-    agentResolve: 'I have cleared the print queue and restarted the spooler service. Please try a test print now.',
-  },
-  'Password Reset': {
-    customerOpen: 'I need a password reset for the store manager account at location {order}.',
-    customerFollow: 'The account is locked after too many failed attempts.',
-    agentFinding: 'I can see the account lockout flag in active directory.',
-    agentResolve: 'I have unlocked the account and sent a password reset link to the registered email. You should receive it within 5 minutes.',
-  },
-  'Account Locked': {
-    customerOpen: 'My Helix portal account is locked and I cannot access store tickets for {order}.',
-    customerFollow: 'I need to check on an open dispatch ticket.',
-    agentFinding: 'I can see three failed login attempts triggered the lockout.',
-    agentResolve: 'Account is unlocked. I have sent a new login link. Please use the reset password option on first login.',
-  },
-  'Software Install Error': {
-    customerOpen: 'The inventory management app failed to install on the back-office PC at store {order}.',
-    customerFollow: 'It shows error code 0x80070643 every time we try.',
-    agentFinding: 'I can see a previous incomplete install is blocking the new deployment.',
-    agentResolve: 'I have cleared the failed install package remotely. Please retry the install - it should complete within 10 minutes.',
-  },
-  'POS Software Crash': {
-    customerOpen: 'The POS application keeps crashing at store {order} every time we try to complete a sale.',
-    customerFollow: 'It happens on multiple registers.',
-    agentFinding: 'I can see a memory leak pattern in the application logs.',
-    agentResolve: 'I have pushed a patch to your terminals remotely. Please restart the POS application and test a transaction.',
-  },
+function fillTemplate(text, ref) {
+  return text.replace(/\{ticket\}/g, ref)
 }
 
-function fillTemplate(text, order) {
-  return text.replace(/\{order\}/g, order)
+function countTranscriptTurns(lines) {
+  let agent = 0
+  let customer = 0
+  for (const line of lines) {
+    if (line.startsWith('Agent (')) agent++
+    else if (line.startsWith('Customer:')) customer++
+  }
+  return { total: lines.length, agent, customer }
+}
+
+function padTranscript(lines, agent, ref, subcategory) {
+  const fillers = [
+    agentLine(agent, 'One moment while I review the ticket details in our system.'),
+    customerLine('Sure, take your time.'),
+    agentLine(agent, 'Thank you for waiting. I can see the full history on ticket ' + ref + '.'),
+    customerLine('Does that change anything about my request?'),
+    agentLine(agent, `To make sure I have this right - you contacted us about ${subcategory.toLowerCase()} on this ticket.`),
+    customerLine('Yes, that is correct.'),
+    agentLine(agent, 'I appreciate your patience while we work through this together.'),
+    customerLine('I just want to make sure it is actually resolved this time.'),
+    agentLine(agent, 'I have noted everything we discussed today on your case for future reference.'),
+    customerLine('Thank you for explaining that clearly.'),
+    agentLine(agent, 'Is there anything else about ticket ' + ref + ' I can help with before we close?'),
+    customerLine('No, I think we have covered everything for now.'),
+    agentLine(agent, 'Thank you for contacting Helix Tech. We appreciate your business.'),
+  ]
+    let fi = 0
+  while (fi < fillers.length) {
+    const { total, agent: a, customer: c } = countTranscriptTurns(lines)
+    if (total >= 8 && a >= 3 && c >= 3) break
+    lines.splice(lines.length - 1, 0, fillers[fi])
+    fi++
+  }
+  return lines
 }
 
 function buildTranscript({
   agent,
-  order,
+  ref,
   subcategory,
-  queue,
+  l1,
+  isHighRisk,
   cfType,
   channel,
   phase,
@@ -339,121 +311,115 @@ function buildTranscript({
   fcr,
   escalated,
 }) {
-  const issue = SUBCATEGORY_ISSUES[subcategory] || {
-    customerOpen: `I need help with ${subcategory.toLowerCase()} on order {order}.`,
-    customerFollow: 'I have the order details ready if you need them.',
-    agentFinding: `Let me pull up order {order} in the system.`,
+  const issue = DRIVER_ISSUE_TEMPLATES[subcategory] || {
+    customerOpen: `I need help with ${subcategory.toLowerCase()} on ticket {ticket}.`,
+    customerFollow: 'I have the ticket details ready if you need them.',
+    agentFinding: `Let me pull up ticket {ticket} in the system.`,
     agentResolve: `I have taken care of your ${subcategory.toLowerCase()} request and documented everything on the case.`,
   }
 
-  const isBenchmark = agent === 'Sipho Ndlovu'
+  const isBenchmark = agent === 'Michael Naidoo'
   const isCoached = COACHED_AGENTS.includes(agent)
   const coachedBadPhase = isCoached && (phase === 'decline' || phase === 'intervention')
-  const kefilweEscalationMiss = agent === 'Kefilwe Sithole' && phase !== 'recovery' && (isRepeat || cfType === 'escalation_avoidance')
+  const zaneleEscalationMiss = agent === 'Zanele Ndlovu' && cfType === 'escalation_avoidance'
 
   const lines = []
 
   if (channel === 'email') {
-    lines.push('Email thread - Helix Tech Support')
-    lines.push(customerLine(`Re: store ${order} - ${subcategory.toLowerCase()}.`))
-    lines.push(agentLine(agent, 'Thank you for contacting Helix Tech Support.'))
+    lines.push('Email thread - Helix Tech Customer Care')
+    lines.push(customerLine(`Re: ticket ${ref} - ${subcategory.toLowerCase()}.`))
+    lines.push(agentLine(agent, 'Thank you for contacting Helix Tech Customer Care.'))
   } else if (channel === 'chat') {
     lines.push('Chat - Helix Tech Support')
-    lines.push(agentLine(agent, 'Hi, thanks for contacting Helix Tech Support. How can I help you today?'))
+    lines.push(agentLine(agent, 'Hi, thanks for chatting with Helix Tech. How can I help you today?'))
   } else {
-    lines.push(agentLine(agent, `Thank you for calling Helix Tech Support, this is ${agent}. How can I help you today?`))
+    lines.push(agentLine(agent, `Thank you for contacting Helix Tech, this is ${agent}. How can I help you today?`))
   }
 
-  if (cfType !== 'no_sla_clock' && !coachedBadPhase) {
-    lines.push(agentLine(agent, 'For verification, can I confirm the store ID and location?'))
-    lines.push(customerLine(`Store ${order}, and the location should be on file from our account setup.`))
-  } else if (cfType === 'no_sla_clock') {
-    lines.push(agentLine(agent, 'I can look into that issue for you right away.'))
-    lines.push(customerLine(fillTemplate(issue.customerOpen, order)))
+  if (cfType !== 'verification_failure' && !coachedBadPhase) {
+    lines.push(agentLine(agent, 'For security, can I confirm the ticket reference and the email address on the account?'))
+    lines.push(customerLine(`Ticket ${ref}, and the email on the account should be on file from when you onboarded.`))
+  } else if (cfType === 'verification_failure') {
+    lines.push(agentLine(agent, 'I can look into that terminal issue for you right away.'))
+    lines.push(customerLine(fillTemplate(issue.customerOpen, ref)))
   } else {
-    lines.push(agentLine(agent, 'Can I get your store ID to get started?'))
-    lines.push(customerLine(`It is ${order}.`))
+    lines.push(agentLine(agent, 'Can I get your ticket reference to get started?'))
+    lines.push(customerLine(`It is ${ref}.`))
   }
 
   if (isRepeat && !cfType) {
-    lines.push(customerLine(`This is my third time contacting Helix about ${subcategory.toLowerCase()} at store ${order}.`))
+    lines.push(customerLine(`This is my third time contacting Helix Tech about ${subcategory.toLowerCase()} on ticket ${ref}.`))
   } else {
-    lines.push(customerLine(fillTemplate(issue.customerOpen, order)))
+    lines.push(customerLine(fillTemplate(issue.customerOpen, ref)))
   }
 
-  lines.push(agentLine(agent, fillTemplate(issue.agentFinding, order)))
+  lines.push(agentLine(agent, fillTemplate(issue.agentFinding, ref)))
+  lines.push(customerLine(fillTemplate(issue.customerFollow, ref)))
 
-  lines.push(customerLine(fillTemplate(issue.customerFollow, order)))
-
-  if (cfType === 'premature_dispatch') {
-    lines.push(agentLine(agent, 'I am going to request an on-site technician right away without running further remote checks.'))
-    lines.push(customerLine('Have you tried rebooting the terminal and checking the network first?'))
-    lines.push(agentLine(agent, 'A technician visit is the fastest path. I am submitting the dispatch request now.'))
-  } else if (cfType === 'escalation_avoidance' || kefilweEscalationMiss) {
-    lines.push(agentLine(agent, 'I understand this is frustrating. Let me try one more remote fix from my side.'))
-    lines.push(customerLine('We have already spoken to two other agents. We need a technician on-site.'))
-    lines.push(agentLine(agent, 'I am sure we can sort this without dispatching. I will refresh the terminal status now.'))
-    lines.push(customerLine('That is what we were told last time. The register is still down.'))
+  if (cfType === 'policy_misquote') {
+    lines.push(agentLine(agent, 'Our standard SLA for critical terminal replacement is 24 hours, so a technician would arrive tomorrow.'))
+    lines.push(customerLine('I thought Helix Tech guaranteed a 4-hour SLA for critical POS failures — that is in our contract.'))
+    lines.push(agentLine(agent, 'The system shows 24 hours for this ticket type. I can note your concern but I cannot expedite beyond that today.'))
+  } else if (cfType === 'escalation_avoidance' || zaneleEscalationMiss) {
+    lines.push(agentLine(agent, 'I understand this is frustrating. Let me try one more time to resolve the terminal issue from my side.'))
+    lines.push(customerLine('I have already spoken to two other agents. I need a supervisor or escalation.'))
+    lines.push(agentLine(agent, 'I am sure we can sort this without escalating. I will refresh the ticket status now.'))
+    lines.push(customerLine('That is what I was told last time. I am not confident this is resolved.'))
     lines.push(agentLine(agent, 'I have updated the notes. Please allow 24 hours and call back if the terminal is still offline.'))
-  } else if (cfType === 'skipped_triage') {
-    lines.push(agentLine(agent, 'I will escalate this to our on-site team without running the standard reboot checklist.'))
-    lines.push(customerLine('Did you check if a reboot would fix it first?'))
-    lines.push(agentLine(agent, 'Dispatch is already submitted. A technician will arrive within 4 hours.'))
-  } else if (cfType === 'no_sla_clock' || (coachedBadPhase && queue === 'POS Hardware' && !isBenchmark)) {
-    lines.push(agentLine(agent, 'I have started working on the terminal issue in the system.'))
-    lines.push(customerLine('When will this be fixed? We have customers waiting.'))
-    lines.push(agentLine(agent, 'It should be resolved soon. Is there anything else I can help with today?'))
-    lines.push(customerLine('So you cannot give us a timeline or ticket reference?'))
-    lines.push(agentLine(agent, 'The system will update automatically once processing completes. Thank you for calling Helix Tech Support.'))
+  } else if (cfType === 'verification_failure') {
+    lines.push(agentLine(agent, 'I will go ahead and dispatch a replacement terminal now without completing merchant verification.'))
+    lines.push(customerLine('Do you need me to confirm anything else for security?'))
+    lines.push(agentLine(agent, 'No, we are fine. The dispatch is submitted.'))
+  } else if (cfType === 'no_resolution_confirmation' || (coachedBadPhase && isHighRisk && !isBenchmark)) {
+    lines.push(agentLine(agent, 'I have logged the hardware fault in the system.'))
+    lines.push(customerLine('When will the replacement terminal arrive on site?'))
+    lines.push(agentLine(agent, 'It should be confirmed soon. Is there anything else I can help with today?'))
+    lines.push(customerLine('So you cannot confirm the dispatch time or tracking reference?'))
+    lines.push(agentLine(agent, 'The system will update automatically once processing completes. Thank you for calling Helix Tech.'))
   } else if (escalated) {
-    lines.push(agentLine(agent, 'This needs our on-site technician team. I am escalating now with full notes on store ' + order + '.'))
-    lines.push(customerLine('How long until someone arrives?'))
-    lines.push(agentLine(agent, 'A technician will be on-site within 4 hours. Your dispatch reference is on the ticket.'))
+    lines.push(agentLine(agent, 'This needs our POS hardware specialist team. I am escalating now with full notes on ticket ' + ref + '.'))
+        lines.push(customerLine('How long until someone contacts me?'))
+    lines.push(agentLine(agent, 'A specialist will reach out within 24 hours. Your escalation reference is on the case.'))
   } else {
-    const triageLine = queue === 'POS Hardware'
-      ? 'Helix policy requires a full remote triage before any on-site dispatch.'
-      : ''
-    if (triageLine && subcategory !== 'Terminal Reboot Required') {
-      lines.push(agentLine(agent, triageLine))
+    const policyLine = isHighRisk ? 'Helix Tech guarantees a 4-hour critical terminal replacement SLA for merchant clients.' : ''
+    if (policyLine && subcategory !== 'Policy Clarification') {
+      lines.push(agentLine(agent, policyLine))
     }
-    lines.push(agentLine(agent, fillTemplate(issue.agentResolve, order)))
-    if (isBenchmark && queue === 'POS Hardware') {
-      lines.push(agentLine(agent, 'To recap: terminal is back online, ticket is resolved remotely, and I have documented all steps on the ticket for store ' + order + '.'))
+    lines.push(agentLine(agent, fillTemplate(issue.agentResolve, ref)))
+    if (isBenchmark && isHighRisk) {
+      lines.push(agentLine(agent, 'To recap: your replacement terminal dispatch is confirmed on ticket ' + ref + '. I have added full notes and the field engineer ETA is on its way by email.'))
     }
   }
 
-  const skipCaseNotes = cfType === 'no_ticket_notes' || (coachedBadPhase && !isBenchmark && rand() < 0.6)
-  if (!skipCaseNotes && fcr && cfType !== 'skipped_triage' && cfType !== 'escalation_avoidance' && !kefilweEscalationMiss) {
-    lines.push(agentLine(agent, 'I have documented today\'s resolution and next steps on your ticket for any future contacts.'))
+  const skipCaseNotes = cfType === 'no_case_notes' || (coachedBadPhase && !isBenchmark && rand() < 0.6)
+  if (!skipCaseNotes && fcr && cfType !== 'no_resolution_confirmation' && cfType !== 'escalation_avoidance' && !zaneleEscalationMiss) {
+    lines.push(agentLine(agent, 'I have documented today\'s resolution and next steps on your case for any future contacts.'))
   }
 
-  if (fcr && cfType !== 'skipped_triage' && !kefilweEscalationMiss && cfType !== 'escalation_avoidance') {
+  if (fcr && cfType !== 'no_resolution_confirmation' && !zaneleEscalationMiss && cfType !== 'escalation_avoidance') {
     lines.push(agentLine(agent, 'Is there anything else I can help you with today?'))
     lines.push(customerLine('No, that covers it. Thank you.'))
-    lines.push(agentLine(agent, 'Thank you for contacting Helix Tech Support. Have a great day.'))
+    lines.push(agentLine(agent, 'Thank you for contacting Helix Tech. Have a great day.'))
   } else if (!fcr) {
-    lines.push(customerLine('We may need to call back if this is not resolved.'))
-    lines.push(agentLine(agent, 'Please use the same ticket reference if you contact us again so we can pick up where we left off.'))
+    lines.push(customerLine('I may need to call back if this is not resolved.'))
+    lines.push(agentLine(agent, 'Please use the same case reference if you contact us again so we can pick up where we left off.'))
   }
 
+  padTranscript(lines, agent, ref,
+    subcategory)
   return lines.join('\n')
 }
 
 function buildRecord(id, weekIdx, opts = {}) {
-  const queue = opts.queue || pickWeighted(QUEUES, QUEUE_WEIGHTS)
+  const { l1, l2 } = pickDriver(opts)
   const channel = opts.channel || pickWeighted(CHANNELS, CHANNEL_WEIGHTS)
   const agent = opts.agent || pick(ALL_AGENTS)
-  const subcats = queue === 'POS Hardware' ? POS_SUBCATEGORIES
-    : queue === 'Network & Connectivity' ? NETWORK_SUBCATEGORIES
-      : queue === 'Printer & Peripherals' ? PRINTER_SUBCATEGORIES
-        : queue === 'Account Access' ? ACCOUNT_SUBCATEGORIES : SOFTWARE_SUBCATEGORIES
-  const subcategory = opts.subcategory || pick(subcats)
 
-  const cluster = opts.cluster || (rand() < 0.35 && queue === 'POS Hardware' ? pick(REPEAT_CLUSTERS) : null)
-  const customer = cluster ? cluster.customer : `Store ${1200 + Math.floor(rand() * 800)} - ${pick(['Sandton', 'Cape Town', 'Durban', 'Pretoria'])}`
-  const order = cluster ? cluster.order : `HL-STR-${20000 + Math.floor(rand() * 8000)}`
+  const cluster = opts.cluster || (rand() < 0.35 && isHighRiskDriver(l1, l2) ? pick(REPEAT_CLUSTERS) : null)
+  const customer = cluster ? cluster.customer : `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`
+  const ref = cluster ? cluster.ticket : `HT-TKT-${20000 + Math.floor(rand() * 8000)}`
 
-  const params = weekParams(weekIdx, queue, agent)
+  const params = weekParams(weekIdx, l1, l2, agent)
   const { date, time } = dateInWeek(weekIdx)
 
   const fcr = opts.fcr ?? (rand() < params.fcrBase)
@@ -485,14 +451,15 @@ function buildRecord(id, weekIdx, opts = {}) {
   const qaPass = !critical && qaScore >= 70
 
   const cfLabel = critical ? CF_TYPES.find((c) => c.id === cfType)?.label : null
-  const prefix = critical ? 'HL-TK-CF' : 'HL-TK-'
+  const prefix = critical ? 'HT-RX-CF' : 'HT-VR-'
   const callId = opts.callId || `${prefix}${String(id).padStart(6, '0')}`
 
   const transcript = buildTranscript({
     agent,
-    order,
-    subcategory,
-    queue,
+    ref,
+    subcategory: l2,
+    l1,
+    isHighRisk: params.isHighRisk,
     cfType: critical ? cfType : null,
     channel,
     phase: params.phase,
@@ -500,10 +467,25 @@ function buildRecord(id, weekIdx, opts = {}) {
     fcr,
     escalated,
   })
-  const summary = `Contact regarding store ${order} (${subcategory}) via ${channel}. `
+
+  const summary = `Contact regarding ticket ${ref} (${l2}) via ${channel}. `
     + (critical ? `Critical failure flagged: ${cfLabel}. ` : '')
     + (isRepeat ? 'This is a repeat contact on the same issue. ' : '')
     + (fcr ? 'Issue resolved on first contact.' : 'Issue not fully resolved; follow-up may be required.')
+
+  let micro_coaching_action = null
+  let formal_coaching_flag = false
+  if (critical && cfType) {
+    const shortLabel = CF_TYPES.find((c) => c.id === cfType)?.label?.split(':')[0] || cfType
+    micro_coaching_action = `QiQ micro coaching: ${shortLabel} flagged on this contact — review protocol before your next POS shift.`
+  } else if (!fcr && params.isHighRisk) {
+    micro_coaching_action = `QiQ micro coaching: Confirm dispatch ETA and terminal serial before closing POS hardware contacts.`
+  } else if (COACHED_AGENTS.includes(agent) && params.isHighRisk && (params.phase === 'decline' || params.phase === 'intervention')) {
+    micro_coaching_action = `QiQ micro coaching: ${agent.split(' ')[0]}, you missed resolution confirmation on a ticket contact today.`
+  }
+  if (COACHED_AGENTS.includes(agent) && params.phase === 'recovery' && params.isHighRisk) {
+    formal_coaching_flag = true
+  }
 
   return {
     call_id: callId,
@@ -511,12 +493,14 @@ function buildRecord(id, weekIdx, opts = {}) {
     agent_name: agent,
     call_date: date,
     call_time: time,
-    call_category: queue,
-    call_subcategory: subcategory,
-    merchant_name: customer,
-    merchant_contact: order,
+    driver_category: l1,
+    driver_subcategory: l2,
+    call_category: l1,
+    call_subcategory: l2,
+    client_name: customer,
+    client_contact: ref,
     channel,
-    order_number: order,
+    ticket_number: ref,
     call_handling_time: aht,
     transcript,
     narrative_summary: summary,
@@ -532,13 +516,19 @@ function buildRecord(id, weekIdx, opts = {}) {
     qa_score: critical ? 0 : qaScore,
     qa_pass: qaPass,
     auto_fail_reasons: critical ? [cfLabel] : [],
-    key_strengths: fcr ? ['Clear communication on Helix support protocol.'] : [],
+    key_strengths: fcr ? ['Clear communication on Helix Tech policy.'] : [],
     key_gaps: critical ? [cfLabel] : !fcr ? ['Resolution not confirmed at close.'] : [],
     questions_met: Math.floor(qaScore / 10),
     questions_not_met: 14 - Math.floor(qaScore / 10),
-    section_scores: sectionScores(queue, qaScore, cfType),
+    section_scores: sectionScores(params.isHighRisk, qaScore, cfType),
     question_evaluations: makeQuestionEvals(qaScore, cfType),
+    micro_coaching_action,
+    formal_coaching_flag,
   }
+}
+
+function isHighRiskRecord(r) {
+  return isHighRiskDriver(r.driver_category || r.call_category, r.driver_subcategory || r.call_subcategory)
 }
 
 // --- Generate ---
@@ -548,7 +538,7 @@ let cfCounter = 1
 
 for (let w = 0; w < WEEKS; w++) {
   const weekCount = w === WEEKS - 1 ? TOTAL - records.length : PER_WEEK
-  const cfTarget = w < 4 ? 12 + w * 2 : w < 6 ? 6 - (w - 4) * 2 : 2
+  const cfTarget = CF_WEEKLY_TARGET[w]
 
   const cfSlots = new Set()
   while (cfSlots.size < cfTarget && cfSlots.size < weekCount) {
@@ -558,52 +548,64 @@ for (let w = 0; w < WEEKS; w++) {
   for (let i = 0; i < weekCount; i++) {
     const isCf = cfSlots.has(i)
     const cfType = isCf ? CF_TYPES[cfCounter % CF_TYPES.length].id : null
-  const record = buildRecord(id++, w, {
+    const record = buildRecord(id++, w, {
       forceCritical: isCf,
       cfType,
-      callId: isCf ? `HL-TK-CF${String(cfCounter++).padStart(4, '0')}` : undefined,
-      agent: isCf && w < 5 ? pick([...COACHED_AGENTS, 'Kefilwe Sithole']) : undefined,
-      queue: isCf ? 'POS Hardware' : undefined,
+      callId: isCf ? `HT-RX-CF${String(cfCounter++).padStart(4, '0')}` : undefined,
+      agent: isCf && w < 5 ? pick([...COACHED_AGENTS, 'Zanele Ndlovu']) : undefined,
+      forceHighRisk: isCf || undefined,
     })
     records.push(record)
   }
 }
 
-// Add dense repeat clusters for returns search
-for (const cluster of REPEAT_CLUSTERS.slice(0, 30)) {
+for (const cluster of REPEAT_CLUSTERS.slice(0, 140)) {
   for (let c = 0; c < cluster.contacts; c++) {
-    if (records.length >= TOTAL + 50) break
+    if (records.length >= TOTAL + 200) break
     const w = c === 0 ? Math.floor(rand() * 4) : Math.min(7, Math.floor(rand() * 4) + c)
     records.push(buildRecord(id++, w, {
       cluster,
-      queue: 'POS Hardware',
-      subcategory: pick(['POS Not Connecting', 'Terminal Reboot Required', 'Card Reader Failure']),
+      l1: 'Billing & Payments',
+      l2: pick(['Hardware Replacement', 'Contract Billing', 'Billing Inquiries']),
       isRepeat: c > 0,
       agent: pick(COACHED_AGENTS),
-      fcr: c === cluster.contacts - 1 ? false : false,
+      fcr: false,
       forceCritical: c === cluster.contacts - 1 && rand() < 0.4,
-      cfType: c === cluster.contacts - 1 ? 'no_ticket_notes' : null,
+      cfType: c === cluster.contacts - 1 ? 'no_case_notes' : null,
     }))
   }
 }
 
-// Trim or pad to exactly TOTAL (replace tail if over)
 while (records.length > TOTAL) records.pop()
 while (records.length < TOTAL) {
-  records.push(buildRecord(id++, 7, { queue: 'Account Access' }))
+  records.push(buildRecord(id++, 7, { l1: 'General Support' }))
 }
 
-// Force ~18% CSAT < 3 (calibrate)
-const lowCsatTarget = Math.round(TOTAL * 0.18)
-let lowIndices = records
-  .map((r, i) => ({ i, csat: r.predicted_csat_score }))
-  .filter((x) => x.csat < 3)
-  .map((x) => x.i)
+for (const featured of FEATURED_CF_CALLS) {
+  const idx = records.findIndex((r) => r.call_id === featured.callId)
+  if (idx < 0) continue
+  const w = WEEK_BOUNDARIES.findIndex((wb) => featured.date >= wb.start && featured.date <= wb.end)
+  const rebuilt = buildRecord(idx + 1, Math.max(0, w), {
+    callId: featured.callId,
+    agent: featured.agent,
+    cfType: featured.cfType,
+    forceCritical: true,
+    l1: 'Orders & Transactions',
+    l2: 'Terminal Failures',
+    fcr: false,
+    isRepeat: featured.cfType === 'no_case_notes' || featured.cfType === 'escalation_avoidance',
+  })
+  rebuilt.call_date = featured.date
+  records[idx] = rebuilt
+}
 
-// Raise excess low-CSAT records above 3
+// Calibrate CSAT < 3 ~18%
+const lowCsatTarget = Math.round(TOTAL * 0.18)
+let lowIndices = records.map((r, i) => ({ i, csat: r.predicted_csat_score })).filter((x) => x.csat < 3).map((x) => x.i)
+
 if (lowIndices.length > lowCsatTarget) {
   const toRaise = lowIndices
-    .filter((i) => records[i].call_category !== 'POS Hardware' || rand() > 0.5)
+    .filter((i) => !isHighRiskRecord(records[i]) || rand() > 0.5)
     .slice(0, lowIndices.length - lowCsatTarget)
   for (const i of toRaise) {
     records[i].predicted_csat_score = Math.round((3.1 + rand() * 0.8) * 10) / 10
@@ -614,38 +616,33 @@ if (lowIndices.length > lowCsatTarget) {
 lowIndices = records.map((r, i) => (r.predicted_csat_score < 3 ? i : -1)).filter((i) => i >= 0)
 for (const i of records.map((_, idx) => idx)) {
   if (lowIndices.length >= lowCsatTarget) break
-  if (records[i].predicted_csat_score >= 3 && records[i].call_category === 'POS Hardware') {
+  if (records[i].predicted_csat_score >= 3 && isHighRiskRecord(records[i])) {
     records[i].predicted_csat_score = Math.round((2 + rand() * 0.9) * 10) / 10
     records[i].predicted_csat_label = records[i].predicted_csat_score < 2.5 ? 'Very Dissatisfied' : 'Dissatisfied'
     lowIndices.push(i)
   }
 }
 
-// Calibrate AHT toward 348s period average
 const currentAht = records.reduce((s, r) => s + r.call_handling_time, 0) / records.length
-const ahtScale = 570 / currentAht
+const ahtScale = 348 / currentAht
 for (const r of records) {
   r.call_handling_time = Math.round(r.call_handling_time * ahtScale)
-  if (r.call_category === 'POS Hardware') {
+  if (isHighRiskRecord(r)) {
     r.call_handling_time = Math.round(r.call_handling_time * 1.08)
   }
 }
 
-// Calibrate repeat rate toward 23%
-const repeatTarget = Math.round(TOTAL * 0.21)
+const repeatTarget = Math.round(TOTAL * 0.23)
 let repeatCount = records.filter((r) => r.is_repeat_contact).length
 if (repeatCount < repeatTarget) {
-  const candidates = records
-    .filter((r) => !r.is_repeat_contact && r.call_category === 'POS Hardware')
-    .sort(() => rand() - 0.5)
+  const candidates = records.filter((r) => !r.is_repeat_contact && isHighRiskRecord(r)).sort(() => rand() - 0.5)
   for (const r of candidates.slice(0, repeatTarget - repeatCount)) {
     r.is_repeat_contact = true
   }
 }
 
-// Boost coached agents W7-W8 returns FCR
 for (const r of records) {
-  if (COACHED_AGENTS.includes(r.agent_name) && r.call_category === 'POS Hardware' && r.call_date >= '2026-05-18') {
+  if (COACHED_AGENTS.includes(r.agent_name) && isHighRiskRecord(r) && r.call_date >= '2026-05-18') {
     if (rand() < 0.75) {
       r.fcr_resolved = true
       r.predicted_csat_score = Math.round(Math.max(r.predicted_csat_score, 3.5) * 10) / 10
@@ -653,18 +650,134 @@ for (const r of records) {
   }
 }
 
-// Nudge period FCR to ~61%
 const fcrCount = records.filter((r) => r.fcr_resolved).length
-const targetFcr = Math.round(TOTAL * 0.72)
+const targetFcr = Math.round(TOTAL * 0.61)
 if (fcrCount > targetFcr) {
-  const toFlip = records.filter((r) => r.fcr_resolved && r.call_category === 'Account Access').slice(0, fcrCount - targetFcr)
+  const toFlip = records.filter((r) => r.fcr_resolved && r.driver_category === 'General Support').slice(0, fcrCount - targetFcr)
   for (const r of toFlip) r.fcr_resolved = false
 } else if (fcrCount < targetFcr) {
-  const toFlip = records.filter((r) => !r.fcr_resolved && r.call_category === 'Account Access').slice(0, targetFcr - fcrCount)
+  const toFlip = records.filter((r) => !r.fcr_resolved && r.driver_category === 'General Support').slice(0, targetFcr - fcrCount)
   for (const r of toFlip) r.fcr_resolved = true
 }
 
-// --- Stats ---
+const escTarget = Math.round(TOTAL * 0.092)
+let escCount = records.filter((r) => r.escalated).length
+if (escCount > escTarget) {
+  for (const r of records.filter((r) => r.escalated && r.driver_category === 'General Support').slice(0, escCount - escTarget)) {
+    r.escalated = false
+  }
+} else if (escCount < escTarget) {
+  for (const r of records.filter((r) => !r.escalated && isHighRiskRecord(r)).slice(0, escTarget - escCount)) {
+    r.escalated = true
+  }
+}
+
+const trTarget = Math.round(TOTAL * 0.141)
+let trCount = records.filter((r) => r.transferred).length
+if (trCount > trTarget) {
+  for (const r of records.filter((r) => r.transferred && !r.escalated && r.driver_category === 'General Support').slice(0, trCount - trTarget)) {
+    r.transferred = false
+  }
+} else if (trCount < trTarget) {
+  for (const r of records.filter((r) => !r.transferred && !r.escalated && isHighRiskRecord(r)).slice(0, trTarget - trCount)) {
+    r.transferred = true
+  }
+}
+
+const csatAvg = records.reduce((s, r) => s + r.predicted_csat_score, 0) / records.length
+const csatShift = 3.6 - csatAvg
+for (const r of records) {
+  r.predicted_csat_score = Math.max(1, Math.min(5, Math.round((r.predicted_csat_score + csatShift) * 10) / 10))
+}
+
+const FEATURED_CF_IDS = new Set(FEATURED_CF_CALLS.map((f) => f.callId))
+
+function clearCriticalFlag(record) {
+  record.critical_failure = false
+  record.critical_failure_category = null
+  record.qa_score = Math.max(72, record.qa_score || 75)
+  record.qa_pass = record.qa_score >= 70
+  record.auto_fail_reasons = []
+  record.key_gaps = record.fcr_resolved ? [] : ['Resolution not confirmed at close.']
+}
+
+function applyCriticalFlag(record, cfTypeId) {
+  const cfMeta = CF_TYPES.find((c) => c.id === cfTypeId) || CF_TYPES[0]
+  record.critical_failure = true
+  record.critical_failure_category = cfMeta.id
+  record.qa_score = 0
+  record.qa_pass = false
+  record.fcr_resolved = false
+  record.auto_fail_reasons = [cfMeta.label]
+  record.key_gaps = [cfMeta.label]
+  if (!record.micro_coaching_action) {
+    const shortLabel = cfMeta.label.split(':')[0]
+    record.micro_coaching_action = `QiQ micro coaching: ${shortLabel} flagged on this contact — review protocol before your next POS shift.`
+  }
+}
+
+for (let w = 0; w < WEEKS; w++) {
+  const wb = WEEK_BOUNDARIES[w]
+  const target = CF_WEEKLY_TARGET[w]
+  const inWeek = records.filter((r) => r.call_date >= wb.start && r.call_date <= wb.end)
+
+  const refreshCfList = () => inWeek.filter((r) => r.critical_failure)
+  let cfList = refreshCfList()
+
+  while (cfList.length > target) {
+    const removable = cfList.filter((r) => !FEATURED_CF_IDS.has(r.call_id))
+    if (!removable.length) break
+    clearCriticalFlag(removable[removable.length - 1])
+    cfList = refreshCfList()
+  }
+
+  let typeIdx = 0
+  while (cfList.length < target) {
+    const pool = inWeek.filter((r) => !r.critical_failure && !FEATURED_CF_IDS.has(r.call_id))
+    const candidate = pool.find(isHighRiskRecord) || pool[0]
+    if (!candidate) break
+    applyCriticalFlag(candidate, CF_TYPES[typeIdx % CF_TYPES.length].id)
+    typeIdx += 1
+    cfList = refreshCfList()
+  }
+}
+
+function aggregateDrivers(data) {
+  const n = data.length
+  const byL1 = {}
+  const byL2 = {}
+
+  for (const l1 of L1_CATEGORIES) {
+    const subset = data.filter((r) => r.driver_category === l1)
+    if (!subset.length) continue
+    const esc = subset.filter((r) => r.escalated).length
+    byL1[l1] = {
+      volume: subset.length,
+      share: Math.round((subset.length / n) * 1000) / 10,
+      fcr: Math.round((subset.filter((r) => r.fcr_resolved).length / subset.length) * 1000) / 10,
+      aht: Math.round(subset.reduce((s, r) => s + r.call_handling_time, 0) / subset.length),
+      esc: Math.round((esc / subset.length) * 1000) / 10,
+      drivers: {},
+    }
+    for (const l2 of DRIVER_TAXONOMY[l1]) {
+      const sub = subset.filter((r) => r.driver_subcategory === l2)
+      if (!sub.length) continue
+      const subEsc = sub.filter((r) => r.escalated).length
+      const row = {
+        name: l2,
+        volume: sub.length,
+        share: Math.round((sub.length / subset.length) * 1000) / 10,
+        fcr: Math.round((sub.filter((r) => r.fcr_resolved).length / sub.length) * 1000) / 10,
+        aht: Math.round(sub.reduce((s, r) => s + r.call_handling_time, 0) / sub.length),
+        esc: Math.round((subEsc / sub.length) * 1000) / 10,
+      }
+      byL1[l1].drivers[l2] = row
+      byL2[`${l1}::${l2}`] = row
+    }
+  }
+  return { byL1, byL2 }
+}
+
 function aggregate(data) {
   const n = data.length
   const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length
@@ -676,10 +789,11 @@ function aggregate(data) {
   const tr = (data.filter((r) => r.transferred).length / n) * 100
   const csatLow = (data.filter((r) => r.predicted_csat_score < 3).length / n) * 100
 
-  const byQueue = {}
-  for (const q of QUEUES) {
-    const subset = data.filter((r) => r.call_category === q)
-    byQueue[q] = {
+  const byL1 = {}
+  for (const l1 of L1_CATEGORIES) {
+    const subset = data.filter((r) => r.driver_category === l1)
+    if (!subset.length) continue
+    byL1[l1] = {
       count: subset.length,
       aht: avg(subset.map((r) => r.call_handling_time)),
       fcr: (subset.filter((r) => r.fcr_resolved).length / subset.length) * 100,
@@ -688,17 +802,20 @@ function aggregate(data) {
     }
   }
 
-  const byWeek = WEEK_BOUNDARIES.map((w, wi) => {
+  const highRisk = data.filter(isHighRiskRecord)
+  const lowRisk = data.filter((r) => !isHighRiskRecord(r))
+
+  const byWeek = WEEK_BOUNDARIES.map((w) => {
     const subset = data.filter((r) => r.call_date >= w.start && r.call_date <= w.end)
-    const pos = subset.filter((r) => r.call_category === 'POS Hardware')
+    const hr = subset.filter(isHighRiskRecord)
     return {
       week: w.label,
       aht: avg(subset.map((r) => r.call_handling_time)),
       fcr: (subset.filter((r) => r.fcr_resolved).length / subset.length) * 100,
       csat: avg(subset.map((r) => r.predicted_csat_score)),
       cf: subset.filter((r) => r.critical_failure).length,
-      posAht: pos.length ? avg(pos.map((r) => r.call_handling_time)) : 0,
-      posFcr: pos.length ? (pos.filter((r) => r.fcr_resolved).length / pos.length) * 100 : 0,
+      returnsAht: hr.length ? avg(hr.map((r) => r.call_handling_time)) : 0,
+      returnsFcr: hr.length ? (hr.filter((r) => r.fcr_resolved).length / hr.length) * 100 : 0,
     }
   })
 
@@ -707,34 +824,54 @@ function aggregate(data) {
     byChannel[ch] = data.filter((r) => r.channel === ch).length / n
   }
 
-  const coachedPosFcr = {}
+  const coachedReturnsFcr = {}
   for (const agent of COACHED_AGENTS) {
-    const early = data.filter((r) => r.agent_name === agent && r.call_category === 'POS Hardware' && r.call_date <= '2026-05-03')
-    const late = data.filter((r) => r.agent_name === agent && r.call_category === 'POS Hardware' && r.call_date >= '2026-05-18')
-    coachedPosFcr[agent] = {
+    const early = data.filter((r) => r.agent_name === agent && isHighRiskRecord(r) && r.call_date <= '2026-05-03')
+    const late = data.filter((r) => r.agent_name === agent && isHighRiskRecord(r) && r.call_date >= '2026-05-18')
+    coachedReturnsFcr[agent] = {
       w1w4: early.length ? (early.filter((r) => r.fcr_resolved).length / early.length) * 100 : 0,
       w7w8: late.length ? (late.filter((r) => r.fcr_resolved).length / late.length) * 100 : 0,
     }
   }
 
-  return { n, aht, fcr, csat, rcr, er, tr, csatLow, byQueue, byWeek, byChannel, coachedPosFcr }
+  const driverStats = aggregateDrivers(data)
+
+  return {
+    n, aht, fcr, csat, rcr, er, tr, csatLow,
+    byL1, byQueue: byL1,
+    highRisk: {
+      count: highRisk.length,
+      aht: highRisk.length ? avg(highRisk.map((r) => r.call_handling_time)) : 0,
+      fcr: highRisk.length ? (highRisk.filter((r) => r.fcr_resolved).length / highRisk.length) * 100 : 0,
+    },
+    lowRisk: {
+      count: lowRisk.length,
+      fcr: lowRisk.length ? (lowRisk.filter((r) => r.fcr_resolved).length / lowRisk.length) * 100 : 0,
+    },
+    byWeek, byChannel, coachedReturnsFcr, driverStats,
+  }
 }
 
 const stats = aggregate(records)
 
-// Validation
 const errors = []
 if (records.length !== TOTAL) errors.push(`Count ${records.length} !== ${TOTAL}`)
 if (Math.abs(stats.csatLow - 18) > 3) errors.push(`CSAT<3 ${stats.csatLow.toFixed(1)}% not ~18%`)
-if (stats.byQueue['POS Hardware'].fcr >= stats.byQueue['Account Access'].fcr) {
-  errors.push('POS FCR should be worst')
-}
+if (stats.highRisk.fcr >= stats.lowRisk.fcr) errors.push('High-risk FCR should be worst')
 for (const agent of COACHED_AGENTS) {
-  const c = stats.coachedPosFcr[agent]
+  const c = stats.coachedReturnsFcr[agent]
   if (c.w7w8 <= c.w1w4) errors.push(`${agent} FCR not improved W7-W8 vs W1-W4`)
 }
 
-console.log('Dataset stats:', JSON.stringify(stats, null, 2))
+let shortTranscripts = 0
+for (const r of records) {
+  const lines = r.transcript.split('\n').filter(Boolean)
+  const { total, agent: a, customer: c } = countTranscriptTurns(lines)
+  if (total < 8 || a < 3 || c < 3) shortTranscripts++
+}
+if (shortTranscripts > 0) errors.push(`${shortTranscripts} transcripts below minimum length`)
+
+console.log('Dataset stats:', JSON.stringify({ n: stats.n, byL1: stats.byL1, driverStatsL1: Object.fromEntries(Object.entries(stats.driverStats.byL1).map(([k, v]) => [k, { volume: v.volume, share: v.share }])) }, null, 2))
 if (errors.length) {
   console.warn('Validation warnings:', errors)
 } else {

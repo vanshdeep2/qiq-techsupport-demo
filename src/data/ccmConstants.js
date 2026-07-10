@@ -15,7 +15,9 @@ export const POS_AHT = [612, 628, 645, 668, 672, 558, 542, 535]
 export const POS_FCR = [62.0, 48.5, 46.2, 44.0, 52.0, 72.5, 74.0, 71.5]
 export const T1_RESOLUTION = POS_FCR
 export const COACHING_DEPLOYMENT = [0, 0, 0, 0, 100, 80, 60, 40]
-export const CF_WEEKLY = [15, 16, 20, 24, 11, 8, 6, 8]
+export const FORMAL_COACHING_AGENTS = [0, 0, 0, 0, 4, 4, 3, 2]
+export const MICRO_COACHING_TRIGGERS = [28, 31, 34, 36, 24, 14, 9, 6]
+export const CF_WEEKLY = [77, 82, 105, 123, 59, 45, 32, 41]
 export const CF_BAR_COLORS = ['#c0392b', '#c0392b', '#c0392b', '#c0392b', '#d97706', '#1a7a4a', '#1a7a4a', '#1a7a4a']
 
 export const COACHING_HEALTH_STATS = [
@@ -81,7 +83,13 @@ export const PATTERN_CARDS = [
   { variant: 'red', title: 'POS Queue Performance Gap', level: 'Queue level', body: 'POS Hardware is the worst-performing queue on every KPI: 58% FCR vs 82% on Account Access, 612s AHT vs 385s, 32% repeat contact rate, and lowest CSAT at 3.2. Triage Accuracy and Escalation Discipline are the weakest quality pillars.', tags: [{ text: 'FCR -24%', className: 'tag tag-red' }, { text: 'AHT +227s', className: 'tag tag-red' }, { text: 'RCR +18pts', className: 'tag tag-red' }, { text: 'CSAT -0.6', className: 'tag tag-red' }] },
   { variant: 'amber', title: 'Micro Coaching Without Remote Triage', level: 'Agent level', body: 'Daily QiQ micro coaching fired on POS agents throughout W1-W4 but behaviour did not improve - agents continued escalating before completing the remote triage checklist. This pattern triggered formal coaching for 4 agents at W5.', tags: [{ text: 'Micro daily W1-W4', className: 'tag tag-amber' }, { text: 'No behaviour change', className: 'tag tag-amber' }, { text: '4 formal flags W5', className: 'tag tag-amber' }] },
   { variant: 'green', title: 'Formal Coaching Drives POS Recovery', level: 'Team level', body: 'After W5 formal TL-led sessions on the four flagged agents, POS queue FCR rose from 52% to 72% by W8. CSAT partially recovered and repeat contact rate dropped. Micro coaching frequency on coached agents fell as behaviours stabilised.', tags: [{ text: 'FCR +20pts', className: 'tag tag-green' }, { text: 'CSAT +0.2', className: 'tag tag-green' }, { text: 'RCR -6pts', className: 'tag tag-green' }] },
-  { variant: 'red', title: 'Critical Failure Cluster on POS', level: 'Quality level', body: 'Five critical failure types cluster on POS contacts: premature dispatch, skipped triage, no SLA clock, no ticket notes, and escalation avoidance. 75 critical failures in W1-W4 vs 22 in W6-W8.', tags: [{ text: 'CF 75 → 22', className: 'tag tag-green' }, { text: '5 failure types', className: 'tag tag-red' }, { text: 'POS queue', className: 'tag tag-red' }] },
+  { variant: 'red', title: 'Critical Failure Cluster on POS', level: 'Quality level', body: 'Five critical failure types cluster on POS contacts: SLA misquote, skipped triage, no SLA clock, no ticket notes, and escalation avoidance. 387 critical failures in W1–W4 vs 118 in W6–W8.', tags: [{ text: 'CF 387 → 118', className: 'tag tag-green' }, { text: '5 failure types', className: 'tag tag-red' }, { text: 'POS queue', className: 'tag tag-red' }] },
+]
+
+export const QUEUE_COMPARISON = [
+  { queue: 'POS Hardware', fcr: '58%', aht: '10m 12s', rcr: '32%', csat: '3.2', highlight: true },
+  { queue: 'Software & Connectivity', fcr: '82%', aht: '6m 25s', rcr: '14%', csat: '3.9', highlight: false },
+  { queue: 'Billing & Contracts', fcr: '76%', aht: '6m 48s', rcr: '16%', csat: '3.8', highlight: false },
 ]
 
 export const BEST_PRACTICE_CARDS = [

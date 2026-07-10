@@ -9,7 +9,7 @@ export const Q_NAMES = {
   q6: 'Expectation Setting',
   q7: 'Communication',
   q8: 'Callback',
-  q9: 'Resolution & Close',
+  q9: 'First-Call Fix',
   q10: 'Customer Appreciation',
   q11: 'Documentation Accuracy',
   q12: 'Internal Process',
@@ -20,16 +20,16 @@ export const Q_NAMES = {
 export const PASS_FAIL_QS = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q11']
 
 export const AGENT_SLUGS = {
-  'Sipho Ndlovu': 'sipho-ndlovu',
-  'Zanele Mokoena': 'zanele-mokoena',
-  'Ruan Pretorius': 'ruan-pretorius',
-  'Nompumelelo Dube': 'nompumelelo-dube',
-  'Andile Khumalo': 'andile-khumalo',
-  'Mariska Joubert': 'mariska-joubert',
-  'Thabo Mahlangu': 'thabo-mahlangu',
-  'Kefilwe Sithole': 'kefilwe-sithole',
-  'Jaco Steyn': 'jaco-steyn',
-  'Aisha Osman': 'aisha-osman',
+  'Michael Naidoo': 'michael-naidoo',
+  'Nomsa Dlamini': 'nomsa-dlamini',
+  'Lerato Nkosi': 'lerato-nkosi',
+  'Pieter Botha': 'pieter-botha',
+  'Busisiwe Maseko': 'busisiwe-maseko',
+  'Ayanda Mbeki': 'ayanda-mbeki',
+  'Zanele Ndlovu': 'zanele-ndlovu',
+  'Thabo van der Merwe': 'thabo-van-der-merwe',
+  'Janine Jacobs': 'janine-jacobs',
+  'Sipho Khumalo': 'sipho-khumalo',
 }
 
 export const DEFAULT_FILTERS = {
@@ -55,7 +55,20 @@ export const WEEK_BOUNDARIES = [
   { start: '2026-05-25', end: '2026-05-31', label: 'W8' },
 ]
 
-export const CF_QUICK_LINKS = FLAGGED_CALLS.filter((c) => c.callId.startsWith('HL-TK-CF')).map((c) => ({
+export const CF_CATEGORY_LABELS = {
+  policy_misquote: 'Policy misquote',
+  no_resolution_confirmation: 'No resolution confirmation',
+  no_case_notes: 'No case notes',
+  escalation_avoidance: 'Escalation avoidance',
+  verification_failure: 'Verification failure',
+}
+
+export function formatCfCategory(categoryId) {
+  if (!categoryId) return 'Critical failure'
+  return CF_CATEGORY_LABELS[categoryId] || categoryId.replace(/_/g, ' ')
+}
+
+export const CF_QUICK_LINKS = FLAGGED_CALLS.filter((c) => c.callId.startsWith('HT-RX')).map((c) => ({
   callId: c.callId,
   agent: c.agent,
   label: c.callId,

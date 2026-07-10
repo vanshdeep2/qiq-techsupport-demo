@@ -16,7 +16,7 @@ function finCardKeyDown(setBreakdown, panel) {
   }
 }
 
-export default function MerchantLtvSection({ ltv, onOpenSettings }) {
+export default function MerchantLtvSection({ ltv, onOpenSettings, onNetCardClick }) {
   const [breakdown, setBreakdown] = useState(null)
 
   useEffect(() => {
@@ -33,10 +33,10 @@ export default function MerchantLtvSection({ ltv, onOpenSettings }) {
 
   return (
     <>
-      <div className="connector">Client Contract Retention Risk · 8-Week Period</div>
+      <div className="connector">Customer Retention Risk · 8-Week Period</div>
       <div className="ltv-section-head">
         <p className="section-sublabel ltv-section-sublabel">
-          Contract revenue at risk from dissatisfied retail clients - a retention problem, not a cost-centre problem · Adjust assumptions using view / edit assumptions
+          Revenue at risk from dissatisfied customers - a retention problem, not a cost-centre problem · Adjust assumptions using view / edit assumptions
         </p>
         <button type="button" className="metrics-cta ltv-assumptions-cta" onClick={onOpenSettings}>
           View / edit assumptions
@@ -62,7 +62,7 @@ export default function MerchantLtvSection({ ltv, onOpenSettings }) {
                 <div key={line.key} className="leg-item">
                   <span className="leg-dot" style={{ background: line.dotColor }} />
                   <span className="leg-label">{line.legendLabel}</span>
-                  <span className="leg-val val-red">{fmtDonutCentre(ltv[line.annualKey])}</span>
+                  <span className="leg-val val-red">{fmtDonutCentre(ltv[line.key])}</span>
                 </div>
               ))}
               <div className="leg-divider" />
@@ -92,7 +92,7 @@ export default function MerchantLtvSection({ ltv, onOpenSettings }) {
                 <div key={line.key} className="leg-item">
                   <span className="leg-dot" style={{ background: line.dotColor }} />
                   <span className="leg-label">{line.legendLabel}</span>
-                  <span className="leg-val val-green">{fmtDonutCentre(ltv[line.annualKey])}</span>
+                  <span className="leg-val val-green">{fmtDonutCentre(ltv[line.key])}</span>
                 </div>
               ))}
               <div className="leg-divider" />
@@ -104,11 +104,18 @@ export default function MerchantLtvSection({ ltv, onOpenSettings }) {
           </div>
         </div>
 
-        <div className="net-card">
+        <div
+          className="net-card clickable-card"
+          onClick={onNetCardClick}
+          role={onNetCardClick ? 'button' : undefined}
+          tabIndex={onNetCardClick ? 0 : undefined}
+          onKeyDown={onNetCardClick ? finCardKeyDown(() => {}, 'net') : undefined}
+        >
           <div className="net-eyebrow">Total Retention Impact Surfaced This Period</div>
           <div className="net-val">{fmtMillionShort(ltv.totalSurfacedPeriod)}</div>
           <div className="net-sub">Revenue at risk + LTV protected by coaching</div>
           <div className="net-annualised">Annualised · {fmtUSDK(ltv.totalSurfacedAnnual)}</div>
+          {onNetCardClick && <div className="fin-drill">Details →</div>}
         </div>
       </div>
 

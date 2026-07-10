@@ -43,21 +43,29 @@ export const DRIVER_ROWS = [
 
 export const CROSS_KPI_PATTERNS = [
   {
+    id: 'exec-ckp-1',
+    accent: 'red',
     label: 'Cross-KPI Pattern 1',
     headline: 'Premature L3 dispatch on POS tickets drives repeat contacts and SLA cost',
     body: 'Agents escalating POS hardware tickets to on-site dispatch before completing the remote triage checklist are generating a 32% repeat contact rate on the POS Hardware queue - nearly triple the Account Access queue. Triage Accuracy and Escalation Discipline are the two lowest-scoring quality pillars on POS contacts.',
   },
   {
+    id: 'exec-ckp-2',
+    accent: 'red',
     label: 'Cross-KPI Pattern 2',
     headline: 'Skipped reboot and network checks create unnecessary dispatch cost',
     body: 'Multiple agents dispatched technicians for POS connectivity issues without confirming terminal reboot, cable seating, or store network status. These premature dispatches cluster in weeks 1-4 and map directly to critical failure flags and CSAT scores below 3.',
   },
   {
+    id: 'exec-ckp-3',
+    accent: 'green',
     label: 'Cross-KPI Pattern 3',
     headline: 'Formal coaching at W5 breaks the POS escalation slide',
     body: 'Four agents flagged after 7+ consecutive days of micro coaching on unresolved remote triage received formal TL-led sessions in week 5. POS queue FCR moved from 52% at W5 to 74% by W8; micro coaching frequency on those agents dropped sharply.',
   },
   {
+    id: 'exec-ckp-4',
+    accent: 'amber',
     label: 'Cross-KPI Pattern 4',
     headline: 'Agent variance on POS triage is real and coachable',
     body: 'POS FCR ranges from above 85% for top performers to below 45% for struggling agents on the same queue. Post-coaching improvement on the four flagged agents validates that structured intervention - not queue reassignment - is the lever.',
@@ -65,4 +73,4 @@ export const CROSS_KPI_PATTERNS = [
 ]
 
 export const LIVE_LABEL = 'Live · May 2026'
-export const CALLS_PILL = '2,200 contacts analysed · 8 weeks'
+export const CALLS_PILL = '10,000 contacts analysed · 8 weeks'
