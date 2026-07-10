@@ -33,10 +33,10 @@ export default function MerchantLtvSection({ ltv, onOpenSettings, onNetCardClick
 
   return (
     <>
-      <div className="connector">Customer Retention Risk · 8-Week Period</div>
+      <div className="connector">Client Contract Retention Risk · 8-Week Period</div>
       <div className="ltv-section-head">
         <p className="section-sublabel ltv-section-sublabel">
-          Revenue at risk from dissatisfied customers - a retention problem, not a cost-centre problem · Adjust assumptions using view / edit assumptions
+          Contract revenue at risk from dissatisfied client accounts - a retention problem, not a cost-centre problem · Adjust assumptions using view / edit assumptions
         </p>
         <button type="button" className="metrics-cta ltv-assumptions-cta" onClick={onOpenSettings}>
           View / edit assumptions
@@ -82,7 +82,7 @@ export default function MerchantLtvSection({ ltv, onOpenSettings, onNetCardClick
           onKeyDown={finCardKeyDown(setBreakdown, 'protected')}
         >
           <div className="fin-card-top">
-            <div className="fin-label">LTV Protected by Coaching · QiQ impact</div>
+            <div className="fin-label">Contract Value Protected by Coaching · QiQ impact</div>
             <div className="fin-drill">View breakdown →</div>
           </div>
           <div className="fin-body">
@@ -111,9 +111,9 @@ export default function MerchantLtvSection({ ltv, onOpenSettings, onNetCardClick
           tabIndex={onNetCardClick ? 0 : undefined}
           onKeyDown={onNetCardClick ? finCardKeyDown(() => {}, 'net') : undefined}
         >
-          <div className="net-eyebrow">Total Retention Impact Surfaced This Period</div>
+          <div className="net-eyebrow">Total Client Retention Impact Surfaced This Period</div>
           <div className="net-val">{fmtMillionShort(ltv.totalSurfacedPeriod)}</div>
-          <div className="net-sub">Revenue at risk + LTV protected by coaching</div>
+          <div className="net-sub">Contract revenue at risk + value protected by coaching</div>
           <div className="net-annualised">Annualised · {fmtUSDK(ltv.totalSurfacedAnnual)}</div>
           {onNetCardClick && <div className="fin-drill">Details →</div>}
         </div>

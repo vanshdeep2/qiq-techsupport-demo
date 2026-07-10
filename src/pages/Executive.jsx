@@ -14,9 +14,11 @@ import {
   ACTUAL_AHT,
   CALLS_PILL,
   CROSS_KPI_PATTERNS,
+  CSAT,
   DEFAULTS,
   ER_TARGET,
   ESC_RATE,
+  FCR,
   LIVE_LABEL,
   RCR_RATE,
   RCR_TARGET,
@@ -66,7 +68,7 @@ function LtvSettingsDrawer({
       open={open}
       onClose={onClose}
       title="LTV Assumptions"
-      subtitle="Adjust customer LTV and retention assumptions. Click Recalculate to update all figures on the page."
+      subtitle="Adjust client contract and retention assumptions. Click Recalculate to update all figures on the page."
       size="md"
     >
       {LTV_FIELDS.map((field) => (
@@ -177,7 +179,7 @@ export default function Executive() {
         <div className="briefing-kicker">QiQ Client Intelligence</div>
         <h1 className="briefing-title">Helix Tech Intelligence Briefing</h1>
         <p className="briefing-subtitle briefing-intro">
-          Helix Tech Helix Tech is a US-based B2B POS and payments support provider for mid-market retail chains. The helpdesk resolves terminal failures, software issues, and connectivity problems for merchant clients under managed-service contracts.
+          Helix Tech is a US-based B2B POS and payments support provider for mid-market retail chains. The helpdesk resolves terminal failures, software issues, and connectivity problems for merchant clients under managed-service contracts.
         </p>
 
         <div className="connector">This period - at a glance.</div>
@@ -185,7 +187,7 @@ export default function Executive() {
           <div className="hero-left">
             <div className="hero-eyebrow">QiQ Weekly Intelligence · Week 8 of 8</div>
             <div className="hero-headline">
-              CSAT decline on POS contacts puts {fmtUSDK(ltv.totalRisk)} in customer LTV at risk - formal coaching at W5 is reversing the trend
+              CSAT decline on POS contacts puts {fmtUSDK(ltv.totalRisk)} in client contract value at risk - formal coaching at W5 is reversing the trend
             </div>
             <div className="hero-narrative">
               <p>
@@ -198,15 +200,15 @@ export default function Executive() {
                 <strong>Impact (W6–W8):</strong> POS FCR rose 22 points, CSAT partially recovered, repeat contacts dropped, and critical failures fell from 387 (W1–W4) to 118 (W6–W8).
               </p>
             </div>
-            <p className="hero-wow">Period actuals: CSAT 3.6 (target 4.2) · FCR 61% (target 78%) · RCR 23% (target &lt;12%) · {fmtUSDK(ltv.totalRisk)} revenue at risk</p>
+            <p className="hero-wow">Period actuals: CSAT {CSAT} (target 4.2) · FCR {FCR}% (target 78%) · RCR {RCR_RATE}% (target &lt;{RCR_TARGET}%) · {fmtUSDK(ltv.totalRisk)} revenue at risk</p>
             <div className="hero-chips">
               <button type="button" className="hero-chip chip-red clickable-card" onClick={() => setInsightMetric('exec-chip-csat')}>
                 <span className="chip-dot" style={{ background: '#fca5a5' }} />
-                CSAT 3.6 · 18% of contacts below 3 · retention risk
+                CSAT {CSAT} · 16% of contacts below 3 · retention risk
               </button>
               <button type="button" className="hero-chip chip-amber clickable-card" onClick={() => setInsightMetric('exec-chip-returns')}>
                 <span className="chip-dot" style={{ background: '#fbbf24' }} />
-                Returns &amp; refund drivers · worst on every KPI
+                POS hardware drivers · worst on every KPI
               </button>
               <button type="button" className="hero-chip chip-green clickable-card" onClick={() => setInsightMetric('exec-chip-coaching')}>
                 <span className="chip-dot" style={{ background: '#4ade80' }} />
@@ -307,9 +309,9 @@ export default function Executive() {
           </KPITile>
           <KPITile
             label="FCR · 8-week"
-            value="61%"
+            value={`${FCR}%`}
             target="Target: 78%"
-            changeText="↓ -17pts vs target · recovering W6–W8"
+            changeText="↓ below target · recovering W6–W8"
             colour="red"
             onClick={() => setInsightMetric('exec-fcr')}
           >
@@ -319,7 +321,7 @@ export default function Executive() {
             <>
               <KPITile
                 label="CSAT · 8-week"
-                value="3.60"
+                value={fmtCsat(CSAT)}
                 target="Target: 4.2"
                 changeText="↓ POS drivers dragging average down"
                 colour="amber"
@@ -331,7 +333,7 @@ export default function Executive() {
                 label="Escalation Rate · 8-week"
                 value={`${ESC_RATE}%`}
                 target={`Target: ${ER_TARGET}%`}
-                changeText="↑ Elevated W1–W5 on returns · easing W6–W8"
+                changeText="↑ Elevated W1–W5 on POS · easing W6–W8"
                 colour="red"
                 onClick={() => setInsightMetric('exec-esc')}
               >
@@ -455,7 +457,7 @@ export default function Executive() {
             <div className="dec-row clickable-card" role="button" tabIndex={0} onClick={() => setInsightMetric('exec-ckp-3')} onKeyDown={(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setInsightMetric('exec-ckp-3')}}}>
               <div className="dec-bar" style={{ background: 'var(--red)' }} />
               <div className="dec-body">
-                <div className="dec-title">Scale formal coaching on POS agents - first-call fix protocol from Michael Naidoo benchmark</div>
+                <div className="dec-title">Scale formal coaching on POS agents - first-call fix protocol from Sipho Ndlovu benchmark</div>
                 <span className="dec-type type-pol">Coaching</span>
               </div>
               <div className="dec-cost">{fmtUSDK(ltv.coachingProtectedAnnual)}</div>
@@ -475,21 +477,21 @@ export default function Executive() {
             </div>
             <NBACard
               number={1}
-              title="Extend W5 formal coaching model to remaining returns underperformers - Zanele Ndlovu escalation criteria priority"
+              title="Extend W5 formal coaching model to remaining POS underperformers - Zanele Mokoena escalation criteria priority"
               kpis={['FCR', 'CSAT', 'RCR']}
               impact="High"
               onClick={() => setInsightMetric('exec-watch-zanele')}
             />
             <NBACard
               number={2}
-              title="Make 4-hour SLA policy card visible on every returns contact - eliminate policy misquote critical failures"
+              title="Make 4-hour SLA policy card visible on every POS contact - eliminate policy misquote critical failures"
               kpis={['CF', 'CSAT']}
               impact="High"
               onClick={() => setInsightMetric('ccm-bp-1')}
             />
             <NBACard
               number={3}
-              title="Scale Michael Naidoo POS close protocol across full POS driver squad"
+              title="Scale Sipho Ndlovu POS triage protocol across full POS driver squad"
               kpis={['FCR', 'AHT']}
               impact={fmtUSDK(ltv.totalProtectedAnnual)}
               onClick={() => setInsightMetric('ccm-bp-0')}
@@ -502,21 +504,21 @@ export default function Executive() {
             <button type="button" className="watch-row clickable-card" onClick={() => setInsightMetric('exec-watch-rcr')}>
               <div className="watch-dot" style={{ background: 'var(--red)' }} />
               <div>
-                <div className="watch-title">Repeat contact rate 23% - nearly double 12% target</div>
+                <div className="watch-title">Repeat contact rate {RCR_RATE}% - above {RCR_TARGET}% target</div>
                 <div className="watch-proj">POS drivers drive 31% RCR. Track whether documentation coaching reduces repeats below 15% by W10.</div>
               </div>
             </button>
             <button type="button" className="watch-row clickable-card" onClick={() => setInsightMetric('exec-watch-zanele')}>
               <div className="watch-dot" style={{ background: 'var(--amber)' }} />
               <div>
-                <div className="watch-title">Zanele Ndlovu - 34% POS FCR · 3 critical failures</div>
+                <div className="watch-title">Zanele Mokoena - 34% POS FCR · 3 critical failures</div>
                 <div className="watch-proj">Second formal coaching session open. Escalation avoidance remains the primary risk on POS drivers.</div>
               </div>
             </button>
             <button type="button" className="watch-row clickable-card" onClick={() => setInsightMetric('exec-watch-csat')}>
               <div className="watch-dot" style={{ background: 'var(--amber)' }} />
               <div>
-                <div className="watch-title">CSAT 3.6/5 - 18% of contacts below 3</div>
+                <div className="watch-title">CSAT {CSAT}/5 - 16% of contacts below 3</div>
                 <div className="watch-proj">At 28% non-renewal benchmark and $720,000 client LTV, dissatisfied contacts represent {fmtUSDK(ltv.dissatisfiedRiskAnnual)} in contract revenue at risk annually. Retention recovery depends on POS coaching sustaining W6-W8 gains.</div>
               </div>
             </button>

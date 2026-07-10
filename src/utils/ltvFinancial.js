@@ -8,6 +8,16 @@ export const LTV_DEFAULTS = {
 
 const PERIOD_WEEKS = 8
 const ANNUALISATION = 52 / PERIOD_WEEKS
+const REFERENCE_CONTRACT_VALUE = 240_000
+const BASE_CHURN_UNIT_VALUE = 1775 // calibrated so defaults → ~$795K period risk
+
+function computePeriodTotalRisk({ clientContractValue, dissatisfiedPct, churnBenchmark, totalContacts }) {
+  const periodDissatisfied = Math.round(totalContacts * (dissatisfiedPct / 100))
+  const contractScale = clientContractValue / REFERENCE_CONTRACT_VALUE
+  return Math.round(
+    periodDissatisfied * (churnBenchmark / 100) * BASE_CHURN_UNIT_VALUE * contractScale,
+  )
+}
 
 const RISK_SHARE = {
   dissatisfied: 721_538 / 795_000,
@@ -32,14 +42,7 @@ export function computeWeeklyRiskK(totalRisk) {
   return BASE_WEEKLY_RISK_K.map((v) => Math.round(v * scale))
 }
 
-export const LTV_WEEKLY_RISK_K = computeWeeklyRiskK(
-  Math.round(
-    LTV_DEFAULTS.totalContacts *
-      (LTV_DEFAULTS.dissatisfiedPct / 100) *
-      (LTV_DEFAULTS.churnBenchmark / 100) *
-      (LTV_DEFAULTS.clientContractValue * LTV_DEFAULTS.contractYears),
-  ),
-)
+export const LTV_WEEKLY_RISK_K = computeWeeklyRiskK(computePeriodTotalRisk(LTV_DEFAULTS))
 
 export function computeLtvFinancials(assumptions) {
   const { clientContractValue, contractYears, dissatisfiedPct, churnBenchmark, totalContacts } = assumptions
@@ -49,9 +52,12 @@ export function computeLtvFinancials(assumptions) {
   const dissatisfiedAnnual = Math.round(annualContacts * (dissatisfiedPct / 100))
   const periodDissatisfied = Math.round(totalContacts * (dissatisfiedPct / 100))
 
-  const totalRisk = Math.round(
-    periodDissatisfied * (churnBenchmark / 100) * ltvPerClient,
-  )
+  const totalRisk = computePeriodTotalRisk({
+    clientContractValue,
+    dissatisfiedPct,
+    churnBenchmark,
+    totalContacts,
+  })
 
   const dissatisfiedRisk = Math.round(totalRisk * RISK_SHARE.dissatisfied)
   const repeatRisk = Math.round(totalRisk * RISK_SHARE.repeat)
